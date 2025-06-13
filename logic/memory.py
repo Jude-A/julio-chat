@@ -47,12 +47,19 @@ def init_vectorstore():
         if embedding:
             embeddings.append(embedding)
     
+    if not embeddings:
+        st.error("⚠️ Aucun embedding n'a pu être généré. Vérifiez votre clé API et vos textes.")
+        st.stop()
+    
     return {
         'texts': texts,
         'embeddings': np.array(embeddings)
     }
 
 def search_memory(vectorstore, query, k=3):
+    if not vectorstore['texts']:
+        return []
+        
     # Génère l'embedding de la requête
     query_embedding = get_embedding(query)
     if query_embedding is None:
