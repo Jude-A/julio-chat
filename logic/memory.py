@@ -1,10 +1,31 @@
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
+from openai import OpenAI
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 import os
+import streamlit as st
 
-# Initialisation du modèle d'embeddings
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# Initialisation du client OpenAI
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    st.error("⚠️ Clé API OpenAI manquante. Veuillez configurer votre clé API dans les secrets de Streamlit Cloud.")
+    st.stop()
+
+try:
+    client = OpenAI(api_key=api_key)
+except Exception as e:
+    st.error(f"⚠️ Erreur lors de l'initialisation du client OpenAI : {str(e)}")
+    st.stop()
+
+def get_embedding(text):
+    try:
+        response = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text
+        )
+        return response.data[0].embedding
+    except Exception as e:
+        st.error(f"⚠️ Erreur lors de la génération des embeddings : {str(e)}")
+        return None
 
 def init_vectorstore():
     # Charge le fichier de souvenirs
@@ -20,16 +41,22 @@ def init_vectorstore():
     texts = [txt.strip() for txt in raw_texts if txt.strip()]
     
     # Génère les embeddings
-    embeddings = model.encode(texts)
+    embeddings = []
+    for text in texts:
+        embedding = get_embedding(text)
+        if embedding:
+            embeddings.append(embedding)
     
     return {
         'texts': texts,
-        'embeddings': embeddings
+        'embeddings': np.array(embeddings)
     }
 
 def search_memory(vectorstore, query, k=3):
     # Génère l'embedding de la requête
-    query_embedding = model.encode([query])[0]
+    query_embedding = get_embedding(query)
+    if query_embedding is None:
+        return []
     
     # Calcule les similarités
     similarities = cosine_similarity([query_embedding], vectorstore['embeddings'])[0]
