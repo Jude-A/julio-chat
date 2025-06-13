@@ -1,7 +1,10 @@
-from langchain.vectorstores import FAISS
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.docstore.document import Document
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 import os
+
+# Initialisation du modèle d'embeddings
+model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def init_vectorstore():
     # Charge le fichier de souvenirs
@@ -13,14 +16,27 @@ def init_vectorstore():
             with open(path, 'r', encoding='utf-8') as f:
                 raw_texts += f.read().split("•")
 
-    # Nettoie et transforme en documents
-    documents = [Document(page_content=txt.strip()) for txt in raw_texts if txt.strip()]
+    # Nettoie les textes
+    texts = [txt.strip() for txt in raw_texts if txt.strip()]
     
-    # Génère les embeddings et crée la base vectorielle
-    embeddings = OpenAIEmbeddings()
-    vectorstore = FAISS.from_documents(documents, embeddings)
+    # Génère les embeddings
+    embeddings = model.encode(texts)
     
-    return vectorstore
+    return {
+        'texts': texts,
+        'embeddings': embeddings
+    }
 
 def search_memory(vectorstore, query, k=3):
-    return vectorstore.similarity_search(query, k=k)
+    # Génère l'embedding de la requête
+    query_embedding = model.encode([query])[0]
+    
+    # Calcule les similarités
+    similarities = cosine_similarity([query_embedding], vectorstore['embeddings'])[0]
+    
+    # Trouve les k textes les plus similaires
+    top_k_idx = np.argsort(similarities)[-k:][::-1]
+    
+    # Retourne les documents correspondants
+    from langchain.docstore.document import Document
+    return [Document(page_content=vectorstore['texts'][idx]) for idx in top_k_idx]
