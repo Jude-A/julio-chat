@@ -11,7 +11,10 @@ if not api_key:
     st.stop()
 
 try:
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.openai.com/v1"
+    )
 except Exception as e:
     st.error(f"⚠️ Erreur lors de l'initialisation du client OpenAI : {str(e)}")
     st.stop()
